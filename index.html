@@ -171,7 +171,7 @@ function pickChild(name,quiet){
   if(!quiet)render();
 }
 function keep(){if($('note'))S.f.note=$('note').value;if($('cap'))S.f.cap=$('cap').value}
-function setF(k,v){keep();S.f[k]=v;render()}
+function setF(k,v){keep();S.f[k]=v;if(k==='go'&&v==='0')S.f.back='same';render()}
 function vForm(){
   var e=evById(S.ev),f=S.f;
   var h='<button class="link" onclick="go(\'event\')">← もどる</button><h1>'+esc(e.name)+'</h1><p class="mute">回答を入れる・直す</p><div class="card">';
