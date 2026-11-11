@@ -37,7 +37,7 @@ label{display:block;font-size:.85rem;color:var(--mute);margin:8px 0 3px}
 <script>
 var S={pass:'',d:null,view:'gate',ev:null,leg:'go',f:null,err:'',busy:false,toast:''};
 var PAL=[['#dbeafe','#1e40af'],['#dcfce7','#166534'],['#ffedd5','#9a3412'],['#ede9fe','#5b21b6'],['#fce7f3','#9d174d'],['#ccfbf1','#115e59'],['#fef9c3','#854d0e'],['#e5e7eb','#374151']];
-var OPT=[['1','① 乗せられる'],['2','② 乗せてほしい'],['24','②か④ 乗せてほしい（電車も可）'],['3','③ 自分の車で行く'],['4','④ 電車・バス'],['5','⑤ 休み']];
+var OPT=[['1','① 乗せられる'],['2','② 乗せてほしい'],['24','②か④ 乗せてほしい（電車も可）'],['3','③ 自分の車で行く'],['4','④ 電車・バス'],['0','未回答（参加予定・送迎はまだ分からない）'],['5','⑤ 休み']];
 function $(id){return document.getElementById(id)}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function store(k,v){try{localStorage.setItem('haisha.'+k,v)}catch(e){}}
@@ -100,7 +100,7 @@ function vList(){
     h+='<div class="card'+(e.open?'':' closed')+'" onclick="go(\'event\',\''+esc(e.id)+'\')" style="cursor:pointer">'+
       '<div class="row"><span class="b">'+esc(e.name)+'</span>'+(e.open?statusPill(e.plan):'<span class="pill warn">受付終了</span>')+'</div>'+
       '<p class="mute">'+esc(e.date)+'</p>'+
-      '<p class="mute">'+(e.deadline?'しめきり '+esc(e.deadline)+'　':'')+'未回答 '+e.plan.missing.length+'人</p></div>';
+      '<p class="mute">'+(e.deadline?'しめきり '+esc(e.deadline)+'　':'')+'回答なし '+e.plan.missing.length+'人</p></div>';
   });
   if(d.role==='admin')h+='<p><button onclick="go(\'admin\')" style="width:100%">係の画面（試合・部員・設定）</button></p>';
   h+='<p style="text-align:center"><button class="link" onclick="logout()">合言葉を入れ直す</button></p>';
@@ -126,10 +126,11 @@ function vEvent(){
   if(r.unplaced.length)h+='<div class="card"><span class="b" style="color:var(--bad)">乗る車が未定</span><br>'+chips(r.unplaced)+'</div>';
   if(r.train.length||r.trainFlex.length)h+='<div class="card"><span class="b">電車・バス</span><br>'+chips(r.train)+chips(r.trainFlex,' <span class="mute">車が足りないため</span>')+'</div>';
   if(r.self.length)h+='<div class="card"><span class="b">自分の車で行く</span><br>'+chips(r.self)+'</div>';
+  if(r.undecided&&r.undecided.length)h+='<div class="card"><span class="b" style="color:var(--warn)">未回答（参加予定）</span><br>'+chips(r.undecided)+'</div>';
   if(p.absent.length||p.missing.length){
     h+='<div class="card">';
     if(p.absent.length)h+='<span class="b">休み</span><br>'+chips(p.absent)+'<br>';
-    if(p.missing.length)h+='<span class="b" style="color:var(--warn)">未回答</span><br>'+chips(p.missing);
+    if(p.missing.length)h+='<span class="b" style="color:var(--warn)">回答なし</span><br>'+chips(p.missing);
     h+='</div>';
   }
   if(e.open||admin)h+='<p><button class="pri" onclick="openForm()">うちの子の回答を入れる・直す</button></p>';
@@ -182,7 +183,7 @@ function vForm(){
   OPT.forEach(function(o){h+='<button class="opt'+(f.go===o[0]?' on':'')+'" onclick="setF(\'go\',\''+o[0]+'\')">'+o[1]+'</button>'});
   if(f.go&&f.go!=='5'){
     h+='<label>帰り</label><button class="opt'+(f.back==='same'?' on':'')+'" onclick="setF(\'back\',\'same\')">行きと同じ</button>';
-    OPT.slice(0,5).forEach(function(o){h+='<button class="opt'+(f.back===o[0]?' on':'')+'" onclick="setF(\'back\',\''+o[0]+'\')">'+o[1]+'</button>'});
+    OPT.filter(function(o){return o[0]!=='5'}).forEach(function(o){h+='<button class="opt'+(f.back===o[0]?' on':'')+'" onclick="setF(\'back\',\''+o[0]+'\')">'+o[1]+'</button>'});
   }
   if(f.go==='1'||f.back==='1'){
     h+='<label for="cap">乗せられる人数（運転する方とご自分のお子さんを除く）</label><select id="cap"><option value="">選んでください</option>';
