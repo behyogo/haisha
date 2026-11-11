@@ -1,1 +1,255 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>配車</title>
+<style>
+:root{--bg:#f2f4f7;--card:#fff;--ink:#18212d;--mute:#5b6677;--line:#d5dbe3;--acc:#1f5fae;--accbg:#e2ebf7;--ok:#1d7549;--okbg:#e0f2e8;--bad:#b3261e;--badbg:#fae3e1;--warn:#8a4b00;--warnbg:#fcefd9}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;font-size:16px;line-height:1.6}
+#app{max-width:560px;margin:0 auto;padding:14px 14px 60px}
+h1{font-size:1.3rem;margin:0 0 4px}h2{font-size:1.05rem;margin:18px 0 8px}
+.mute{color:var(--mute);font-size:.88rem;margin:2px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 10px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.b{font-weight:700}
+.pill{font-size:.8rem;font-weight:700;padding:2px 10px;border-radius:99px;white-space:nowrap}
+.pill.ok{background:var(--okbg);color:var(--ok)}.pill.bad{background:var(--badbg);color:var(--bad)}.pill.info{background:var(--accbg);color:var(--acc)}.pill.warn{background:var(--warnbg);color:var(--warn)}
+.chip{display:inline-block;background:var(--bg);border-radius:8px;padding:3px 9px;margin:5px 5px 0 0;font-size:.95rem}
+.chip.empty{background:transparent;border:1px dashed var(--line);color:var(--mute);font-size:.85rem}
+.g{display:inline-block;font-size:.75rem;font-weight:700;padding:0 7px;border-radius:99px;margin-right:5px;vertical-align:1px}
+button,select,input,textarea{font:inherit;color:inherit}
+button{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:10px 12px;cursor:pointer}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700;width:100%}
+button.opt{display:block;width:100%;text-align:left;margin:0 0 6px}
+button.opt.on{background:var(--accbg);border-color:var(--acc);color:var(--acc);font-weight:700}
+button.link{border:0;background:none;color:var(--acc);padding:6px 0}
+.seg{display:flex;gap:6px;margin:8px 0}.seg button{flex:1}.seg button.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+input[type=text],input[type=password],select,textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:#fff}
+textarea{min-height:90px}
+label{display:block;font-size:.85rem;color:var(--mute);margin:8px 0 3px}
+.err{color:var(--bad);font-size:.9rem;margin:6px 0}
+.note{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:.9rem;margin:0 0 10px;white-space:pre-wrap}
+.busy{opacity:.5;pointer-events:none}
+.two{display:grid;grid-template-columns:1fr 90px;gap:6px;margin:0 0 6px}
+.closed{opacity:.6}
+</style></head><body><div id="app"></div>
+<script>
+var S={pass:'',d:null,view:'gate',ev:null,leg:'go',f:null,err:'',busy:false,toast:''};
+var PAL=[['#dbeafe','#1e40af'],['#dcfce7','#166534'],['#ffedd5','#9a3412'],['#ede9fe','#5b21b6'],['#fce7f3','#9d174d'],['#ccfbf1','#115e59'],['#fef9c3','#854d0e'],['#e5e7eb','#374151']];
+var OPT=[['1','① 乗せられる'],['2','② 乗せてほしい'],['24','②か④ 乗せてほしい（電車も可）'],['3','③ 自分の車で行く'],['4','④ 電車・バス'],['0','未回答（参加予定・送迎はまだ分からない）'],['5','⑤ 休み']];
+function $(id){return document.getElementById(id)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function store(k,v){try{localStorage.setItem('haisha.'+k,v)}catch(e){}}
+function load(k){try{return localStorage.getItem('haisha.'+k)||''}catch(e){return ''}}
+function groupOf(name){var r=S.d.roster;for(var i=0;i<r.length;i++)if(r[i].name===name)return r[i].group;return ''}
+function groups(){var g=[];S.d.roster.forEach(function(r){if(r.group&&g.indexOf(r.group)<0)g.push(r.group)});return g.sort()}
+function gtag(group){if(!S.d.showGroup||!group)return '';var i=groups().indexOf(group);var c=PAL[(i<0?PAL.length-1:i)%PAL.length];return '<span class="g" style="background:'+c[0]+';color:'+c[1]+'">'+esc(group)+'</span>'}
+function nm(name){return gtag(groupOf(name))+esc(name)}
+function chips(list,suffix){return list.map(function(n){return '<span class="chip">'+nm(n)+(suffix||'')+'</span>'}).join('')}
+function evById(id){var e=S.d.events;for(var i=0;i<e.length;i++)if(e[i].id===id)return e[i];return null}
 
+// データのやり取り先（Googleの配車ページ。ここだけGoogleとつながる）
+var API='https://script.google.com/macros/s/AKfycbw2TXiaYh0XRvBCG8YfH8mAZHDKQ7EYTNfdrVEwslf6SC56sWlyOHX_ump3XLA9tB6w/exec';
+function call(action,extra,done){
+  var req={pass:S.pass,action:action};for(var k in (extra||{}))req[k]=extra[k];
+  S.busy=true;S.err='';render();
+  var fail=function(){S.busy=false;S.err='通信できませんでした。電波のよい所でもう一度ためしてください。';render()};
+  fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(req),redirect:'follow',credentials:'omit'})
+    .then(function(res){return res.json()})
+    .then(function(r){
+      S.busy=false;
+      if(!r||!r.ok){
+        if(r&&r.error==='pass'){S.err='合言葉がちがいます。';S.view='gate';S.pass='';store('pass','')}
+        else S.err=(r&&r.error)||'うまくいきませんでした。もう一度ためしてください。';
+        render();return;
+      }
+      S.d=r.data;if(done)done();render();
+    },fail);
+}
+
+function enter(){var v=$('pass').value.trim();if(!v){S.err='合言葉を入れてください。';render();return}S.pass=v;call('load',{},function(){store('pass',S.pass);S.view='list'})}
+function logout(){S.pass='';store('pass','');S.d=null;S.view='gate';render()}
+function go(view,evId){S.view=view;if(evId!==undefined)S.ev=evId;S.err='';S.toast='';if(view==='event')S.leg='go';render();window.scrollTo(0,0)}
+function reload(){call('load',{})}
+
+function statusPill(p){
+  var s=p.go.short+p.back.short;
+  if(s>0)return '<span class="pill bad">車がたりません</span>';
+  if(p.go.need+p.back.need>0)return '<span class="pill ok">席は足りています</span>';
+  return '<span class="pill info">受付中</span>';
+}
+function legPill(r){
+  if(r.short>0)return '<span class="pill bad">あと'+r.short+'席</span>';
+  if(r.need>0)return '<span class="pill ok">席は足りています</span>';
+  return '<span class="pill info">同乗希望なし</span>';
+}
+
+function vGate(){
+  return '<h1>配車</h1><p class="mute">LINEでお知らせした合言葉を入れてください。</p>'+
+    '<div class="card"><label for="pass">合言葉</label><input id="pass" type="password" autocomplete="off">'+
+    (S.err?'<p class="err">'+esc(S.err)+'</p>':'')+
+    '<p style="margin:10px 0 0"><button class="pri" onclick="enter()">入る</button></p></div>';
+}
+
+function vList(){
+  var d=S.d,h='<div class="row"><h1>'+esc(d.team)+'</h1><button class="link" onclick="reload()">新しくする</button></div>';
+  h+='<p class="mute">試合を押すと、今の配車の状況が見られます。</p>';
+  if(!d.events.length)h+='<div class="card">いま受付中の試合はありません。</div>';
+  d.events.forEach(function(e){
+    h+='<div class="card'+(e.open?'':' closed')+'" onclick="go(\'event\',\''+esc(e.id)+'\')" style="cursor:pointer">'+
+      '<div class="row"><span class="b">'+esc(e.name)+'</span>'+(e.open?statusPill(e.plan):'<span class="pill warn">受付終了</span>')+'</div>'+
+      '<p class="mute">'+esc(e.date)+'</p>'+
+      '<p class="mute">'+(e.deadline?'しめきり '+esc(e.deadline)+'　':'')+'回答なし '+e.plan.missing.length+'人</p></div>';
+  });
+  if(d.role==='admin')h+='<p><button onclick="go(\'admin\')" style="width:100%">係の画面（試合・部員・設定）</button></p>';
+  h+='<p style="text-align:center"><button class="link" onclick="logout()">合言葉を入れ直す</button></p>';
+  return h;
+}
+
+function vEvent(){
+  var e=evById(S.ev);if(!e)return vList();
+  var p=e.plan,r=p[S.leg],admin=S.d.role==='admin';
+  var h='<button class="link" onclick="go(\'list\')">← 試合の一覧</button>';
+  h+='<h1>'+esc(e.name)+'</h1><p class="mute">'+esc(e.date)+'</p><p class="mute">'+esc(e.place)+'</p>';
+  if(e.deadline)h+='<p class="mute">しめきり '+esc(e.deadline)+'</p>';
+  if(S.toast)h+='<div class="note" style="background:var(--okbg);color:var(--ok)">'+esc(S.toast)+'</div>';
+  if(admin&&e.memo)h+='<div class="note">メモ：'+esc(e.memo)+'</div>';
+  h+='<div class="seg"><button class="'+(S.leg==='go'?'on':'')+'" onclick="S.leg=\'go\';render()">行き</button><button class="'+(S.leg==='back'?'on':'')+'" onclick="S.leg=\'back\';render()">帰り</button></div>';
+  h+='<div class="row" style="margin:0 0 8px"><span class="mute">乗せてほしい '+r.need+'人 ／ 席 '+r.seats+'</span>'+legPill(r)+'</div>';
+  r.cars.forEach(function(c){
+    var free=c.cap-c.riders.length,em='';for(var i=0;i<free;i++)em+='<span class="chip empty">空き</span>';
+    h+='<div class="card"><div class="row"><span class="b">'+nm(c.driver)+'さんの車</span><span class="pill '+(free>0?'info':'ok')+'">'+c.riders.length+' / '+c.cap+'席</span></div>'+
+      (c.riders.length||free>0?chips(c.riders)+em:'<p class="mute">乗せられる人数が入っていません</p>')+'</div>';
+  });
+  if(!r.cars.length)h+='<div class="card"><p class="mute" style="margin:0">車を出せる人（①）は、まだいません。</p></div>';
+  if(r.unplaced.length)h+='<div class="card"><span class="b" style="color:var(--bad)">乗る車が未定</span><br>'+chips(r.unplaced)+'</div>';
+  if(r.train.length||r.trainFlex.length)h+='<div class="card"><span class="b">電車・バス</span><br>'+chips(r.train)+chips(r.trainFlex,' <span class="mute">車が足りないため</span>')+'</div>';
+  if(r.self.length)h+='<div class="card"><span class="b">自分の車で行く</span><br>'+chips(r.self)+'</div>';
+  if(r.undecided&&r.undecided.length)h+='<div class="card"><span class="b" style="color:var(--warn)">未回答（参加予定）</span><br>'+chips(r.undecided)+'</div>';
+  if(p.absent.length||p.missing.length){
+    h+='<div class="card">';
+    if(p.absent.length)h+='<span class="b">休み</span><br>'+chips(p.absent)+'<br>';
+    if(p.missing.length)h+='<span class="b" style="color:var(--warn)">回答なし</span><br>'+chips(p.missing);
+    h+='</div>';
+  }
+  if(e.open||admin)h+='<p><button class="pri" onclick="openForm()">うちの子の回答を入れる・直す</button></p>';
+  if(admin)h+=vEventAdmin(e,r);
+  return h;
+}
+
+function vEventAdmin(e,r){
+  var h='<h2>係：割り当てを直す（'+(S.leg==='go'?'行き':'帰り')+'）</h2>';
+  var riders=[];for(var n in e.plan.answers){var v=e.plan.answers[n][S.leg];if(v==='2'||v==='24')riders.push(n)}
+  if(!riders.length)h+='<p class="mute">乗せてほしい人はいません。</p>';
+  riders.forEach(function(n,i){
+    var cur=e.ov[S.leg+'|'+n]||'';
+    var o='<option value="">自動</option>';
+    r.cars.forEach(function(c){o+='<option value="'+esc(c.driver)+'"'+(cur===c.driver?' selected':'')+'>'+esc(c.driver)+'さんの車</option>'});
+    o+='<option value="@train"'+(cur==='@train'?' selected':'')+'>電車・バス</option><option value="@none"'+(cur==='@none'?' selected':'')+'>未定のまま</option>';
+    h+='<div class="row" style="margin:0 0 6px"><span>'+nm(n)+'</span><select style="width:190px" data-n="'+esc(n)+'" onchange="setOv(this)">'+o+'</select></div>';
+  });
+  h+='<h2>係：メモ（保護者には見えません）</h2><textarea id="memo">'+esc(e.memo)+'</textarea><p><button onclick="saveMemo()">メモを保存</button></p>';
+  var notes='';for(var n2 in e.plan.answers){if(e.plan.answers[n2].note)notes+='<p style="margin:4px 0">'+nm(n2)+'：'+esc(e.plan.answers[n2].note)+'</p>'}
+  if(notes)h+='<h2>係：保護者のコメント</h2><div class="card">'+notes+'</div>';
+  h+='<h2>係：LINEに送る文</h2><label>途中経過</label><textarea id="m1" readonly>'+esc(e.msgs.progress)+'</textarea><p><button onclick="copy(\'m1\')">コピー</button></p>'+
+    '<label>配車のお知らせ</label><textarea id="m2" readonly style="min-height:200px">'+esc(e.msgs.final)+'</textarea><p><button onclick="copy(\'m2\')">コピー</button></p>';
+  return h;
+}
+function setOv(el){call('override',{eventId:S.ev,leg:S.leg,name:el.getAttribute('data-n'),to:el.value})}
+function saveMemo(){var e=evById(S.ev);call('saveEvent',{ev:{id:e.id,name:e.name,date:e.date,place:e.place,fee:e.fee,deadline:e.deadline,open:e.open,memo:$('memo').value}},function(){S.toast='メモを保存しました。'})}
+function copy(id){var t=$(id);function sel(){t.focus();t.select();S.toast='文を選びました。長押しでコピーしてください。'}
+  try{navigator.clipboard.writeText(t.value).then(function(){S.toast='コピーしました。LINEに貼り付けてください。';render()},function(){sel()})}catch(x){sel()}}
+
+function openForm(){
+  var name=load('child');if(!S.d.roster.some(function(r){return r.name===name}))name='';
+  S.f={name:name,go:'',back:'same',cap:'',note:''};pickChild(name,true);S.view='form';S.err='';render();window.scrollTo(0,0);
+}
+function pickChild(name,quiet){
+  S.f.name=name;var a=name?evById(S.ev).plan.answers[name]:null;
+  if(a){S.f.go=a.go;S.f.back=(a.back===a.go&&a.go!=='0'?'same':a.back);S.f.cap=a.cap==null?'':String(a.cap)}else{S.f.go='';S.f.back='same';S.f.cap=''}
+  if(!quiet)render();
+}
+function keep(){if($('note'))S.f.note=$('note').value;if($('cap'))S.f.cap=$('cap').value}
+function setF(k,v){keep();S.f[k]=v;if(k==='go'&&v==='0')S.f.back='0';render()}
+function vForm(){
+  var e=evById(S.ev),f=S.f;
+  var h='<button class="link" onclick="go(\'event\')">← もどる</button><h1>'+esc(e.name)+'</h1><p class="mute">回答を入れる・直す</p><div class="card">';
+  h+='<label for="child">部員</label><select id="child" onchange="keep();pickChild(this.value)"><option value="">選んでください</option>';
+  S.d.roster.forEach(function(r){h+='<option value="'+esc(r.name)+'"'+(f.name===r.name?' selected':'')+'>'+(S.d.showGroup&&r.group?esc(r.group)+'　':'')+esc(r.name)+'</option>'});
+  h+='</select>';
+  if(f.name&&e.plan.answers[f.name])h+='<p class="mute">前の回答が入っています。直して送ると置き換わります。</p>';
+  h+='<label>行き</label>';
+  OPT.forEach(function(o){h+='<button class="opt'+(f.go===o[0]?' on':'')+'" onclick="setF(\'go\',\''+o[0]+'\')">'+o[1]+'</button>'});
+  if(f.go&&f.go!=='5'){
+    h+='<label>帰り</label><button class="opt'+(f.back==='same'?' on':'')+'" onclick="setF(\'back\',\'same\')">行きと同じ</button>';
+    OPT.filter(function(o){return o[0]!=='5'}).forEach(function(o){h+='<button class="opt'+(f.back===o[0]?' on':'')+'" onclick="setF(\'back\',\''+o[0]+'\')">'+o[1]+'</button>'});
+  }
+  if(f.go==='1'||f.back==='1'){
+    h+='<label for="cap">乗せられる人数（運転する方とご自分のお子さんを除く）</label><select id="cap"><option value="">選んでください</option>';
+    for(var i=1;i<=7;i++)h+='<option'+(String(i)===f.cap?' selected':'')+'>'+i+'</option>';
+    h+='</select>';
+  }
+  h+='<label for="note">コメント（係の人だけが見ます）</label><input id="note" type="text" value="'+esc(f.note)+'">';
+  if(S.err)h+='<p class="err">'+esc(S.err)+'</p>';
+  h+='<p style="margin:12px 0 0"><button class="pri" onclick="send()">送る</button></p></div>';
+  return h;
+}
+function send(){
+  keep();var f=S.f;
+  if(!f.name){S.err='部員を選んでください。';render();return}
+  if(!f.go){S.err='行きを選んでください。';render();return}
+  var back=f.go==='5'?'5':(f.back==='same'?f.go:f.back);
+  if((f.go==='1'||back==='1')&&!f.cap){S.err='乗せられる人数を選んでください。';render();return}
+  store('child',f.name);
+  call('answer',{eventId:S.ev,name:f.name,go:f.go,back:back,cap:f.cap,note:f.note},function(){S.view='event';S.toast=f.name+'さんの回答を受け付けました。';window.scrollTo(0,0)});
+}
+
+function vAdmin(){
+  var d=S.d,h='<button class="link" onclick="go(\'list\')">← 試合の一覧</button><h1>係の画面</h1>';
+  if(S.toast)h+='<div class="note" style="background:var(--okbg);color:var(--ok)">'+esc(S.toast)+'</div>';
+  if(S.err)h+='<p class="err">'+esc(S.err)+'</p>';
+  h+='<h2>試合</h2>';
+  d.events.concat([{id:'',name:'',date:'',place:'',fee:'',deadline:'',open:true,memo:''}]).forEach(function(e,i){
+    h+='<details class="card"'+(e.id?'':' open')+'><summary class="b">'+(e.id?esc(e.name)+(e.open?'':'（受付終了）'):'＋ 新しい試合を足す')+'</summary>'+
+      '<label>試合名</label><input type="text" id="e'+i+'name" value="'+esc(e.name)+'" placeholder="11/22 弘陵">'+
+      '<label>日時</label><input type="text" id="e'+i+'date" value="'+esc(e.date)+'" placeholder="11/22（日）8:00-12:00">'+
+      '<label>行先</label><input type="text" id="e'+i+'place" value="'+esc(e.place)+'">'+
+      '<label>旅費</label><input type="text" id="e'+i+'fee" value="'+esc(e.fee)+'">'+
+      '<label>しめきり</label><input type="text" id="e'+i+'deadline" value="'+esc(e.deadline)+'" placeholder="11/18（火）">'+
+      '<label><input type="checkbox" id="e'+i+'open"'+(e.open?' checked':'')+'> 受付中（外すと保護者の画面から消えます）</label>'+
+      '<p><button onclick="saveEv('+i+')">'+(e.id?'保存':'足す')+'</button></p></details>';
+  });
+  h+='<h2>部員とグループ</h2><p class="mute">グループは空でも大丈夫です。名前を消して保存すると、その部員は外れます。</p><div id="ros">';
+  d.roster.concat([{name:'',group:''},{name:'',group:''},{name:'',group:''}]).forEach(function(r){
+    h+='<div class="two"><input type="text" class="rn" value="'+esc(r.name)+'" placeholder="名前"><input type="text" class="rg" value="'+esc(r.group)+'" placeholder="グループ"></div>';
+  });
+  h+='</div><p><button onclick="saveRoster()">部員を保存</button></p>';
+  h+='<h2>設定</h2><div class="card"><label><input type="checkbox" id="sg"'+(d.showGroup?' checked':'')+'> グループ名と色を出す（外すと名前だけになり、割り当てもグループを見ません）</label>'+
+    '<label>チーム名（一覧の見出し）</label><input type="text" id="team" value="'+esc(d.team)+'">'+
+    '<label>保護者の合言葉</label><input type="text" id="pp" value="'+esc(d.passes.parent)+'">'+
+    '<label>係の合言葉</label><input type="text" id="ap" value="'+esc(d.passes.admin)+'">'+
+    '<p><button onclick="saveSet()">設定を保存</button></p></div>';
+  return h;
+}
+function saveEv(i){
+  var all=S.d.events,e=all[i]||{id:'',memo:''};var g=function(k){return $('e'+i+k).value};
+  call('saveEvent',{ev:{id:e.id,name:g('name'),date:g('date'),place:g('place'),fee:g('fee'),deadline:g('deadline'),open:$('e'+i+'open').checked,memo:e.memo||''}},function(){S.toast='試合を保存しました。'});
+}
+function saveRoster(){
+  var n=document.querySelectorAll('#ros .rn'),g=document.querySelectorAll('#ros .rg'),list=[];
+  for(var i=0;i<n.length;i++)list.push({name:n[i].value,group:g[i].value});
+  call('saveRoster',{roster:list},function(){S.toast='部員を保存しました。'});
+}
+function saveSet(){
+  var ap=$('ap').value.trim();
+  call('saveSettings',{showGroup:$('sg').checked,team:$('team').value,parentPass:$('pp').value,adminPass:ap},function(){S.toast='設定を保存しました。';if(ap){S.pass=ap;store('pass',ap)}});
+}
+
+function render(){
+  var h=S.view==='gate'||!S.d?vGate():S.view==='list'?vList():S.view==='event'?vEvent():S.view==='form'?vForm():vAdmin();
+  var a=$('app');a.innerHTML=h;a.className=S.busy?'busy':'';
+}
+S.pass=load('pass');
+if(S.pass)call('load',{},function(){S.view='list'});else render();
+</script></body></html>
