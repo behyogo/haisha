@@ -119,7 +119,7 @@ function vEvent(){
   h+='<div class="row" style="margin:0 0 8px"><span class="mute">乗せてほしい '+r.need+'人 ／ 席 '+r.seats+'</span>'+legPill(r)+'</div>';
   r.cars.forEach(function(c){
     var free=c.cap-c.riders.length,em='';for(var i=0;i<free;i++)em+='<span class="chip empty">空き</span>';
-    h+='<div class="card"><div class="row"><span class="b">'+nm(c.driver)+'さんの車</span><span class="pill '+(free>0?'info':'ok')+'">'+c.riders.length+' / '+c.cap+'席</span></div>'+
+    h+='<div class="card"><div class="row"><span class="b">'+nm(c.driver)+'号</span><span class="pill '+(free>0?'info':'ok')+'">'+c.riders.length+' / '+c.cap+'席</span></div>'+
       (c.riders.length||free>0?chips(c.riders)+em:'<p class="mute">乗せられる人数が入っていません</p>')+'</div>';
   });
   if(!r.cars.length)h+='<div class="card"><p class="mute" style="margin:0">車を出せる人（①）は、まだいません。</p></div>';
@@ -145,7 +145,7 @@ function vEventAdmin(e,r){
   riders.forEach(function(n,i){
     var cur=e.ov[S.leg+'|'+n]||'';
     var o='<option value="">自動</option>';
-    r.cars.forEach(function(c){o+='<option value="'+esc(c.driver)+'"'+(cur===c.driver?' selected':'')+'>'+esc(c.driver)+'さんの車</option>'});
+    r.cars.forEach(function(c){o+='<option value="'+esc(c.driver)+'"'+(cur===c.driver?' selected':'')+'>'+esc(c.driver)+'号</option>'});
     o+='<option value="@train"'+(cur==='@train'?' selected':'')+'>電車・バス</option><option value="@none"'+(cur==='@none'?' selected':'')+'>未定のまま</option>';
     h+='<div class="row" style="margin:0 0 6px"><span>'+nm(n)+'</span><select style="width:190px" data-n="'+esc(n)+'" onchange="setOv(this)">'+o+'</select></div>';
   });
